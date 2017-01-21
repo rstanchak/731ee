@@ -1,0 +1,149 @@
+\documentclass{article}
+\title{ Image Segementation Using Normalized Cut\\ Image Understand ENEE 731 }
+\author{ Roman Stanchak }
+\date{ October 27, 2006 }
+
+%%%% includes %%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\bibliographystyle{plain}
+
+%%%% macros %%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\gaussian}[2]{\frac{1}{ \sqrt{2\pi #1^2}}e^\frac{-{#2}^2}{2 #1^2}}
+\newcommand{\fourier}{\mathcal{F}}
+\newcommand{\dsigma}{\Delta\sigma}
+%%%% document %%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+\section{Normalized Cut}
+The normalized cut image segmentation algorithm proposed by Shi and Malik introduces the
+concept of Spectral Graph Theory to the field of Computer Vision \cite{shi00normalized}.
+The algorithm represents pixels in an
+image as nodes in a graph, with weighted edges corresponding to a similarity 
+measure between pixels.  By finding the cut of the graph that optimizes the normalized cut 
+criteria (NCut), the algorithm effectively segments the image in a globally optimal manner. 
+
+The basic spectral segmentation algorithm is outlined in Algorithm~\ref{alg:ncut}.  The version
+presented in Shi and Malik differs in some details, but the basic theory is identical.
+\begin{algorithm}[htb]
+	\caption{Normalized Cut Algorithm}
+	\label{alg:ncut}
+	\begin{algorithmic}[1]
+		\STATE Compute affinity matrix $W$ between pixels in image $I$.
+		\STATE Let $D$ be a diagonal matrix where the diagonal entries $d_i,i = \sum_j W_{i,j}$
+		\STATE Compute the graph laplacian matrix $L=D-W$
+		\STATE Normalize the graph laplacian $L_sym=D^{-1/2}LD^{-1/2}$
+		\STATE Compute the eigenvectors $v_i$ of $L_sym$
+		\STATE Ignoring the first eigenvector $v_1$, construct matrix $V=[v_2 \dots v_k]$ where
+		k is the number of clusters to find. 
+		\STATE Compute K-means on the rows of $V$
+		\STATE Each row of $V$ corresponds to a pixel in the original image, so the k-means clustering
+		is a segmentation of the original image into $k$ segments.
+	\end{algorithmic}
+\end{algorithm}
+
+In practice, a major drawback in using this algorithm on typical images is 
+that the dimensionality of the affinity matrix 
+($MN \times MN$ for an $M \times N$ image) exceeds the available memory on 
+current computing hardware.  By computing the affinity matrix for only the pixels within
+a neighborhood $r$ and representing it sparsely, this dimensionality goes down to
+roughly $MN \times r^2$.  Unfortunately, the sparse eigensolver implementation in matlab
+is dependent on the number of non-zero elements in the matrix, so even for $r=1$ on a 
+moderately sized image ($512\times512$), solver ran out of memory.  
+Furthermore, very small values of $r$ adversely affected the quality of the segmentation,
+often leading to instances where only small regions (on the order of 10 pixels) were
+found.  These drawbacks motivated a multiscale approach described below.
+
+\subsection{Multiscale Recursive Normalized Cut}
+The following simplistic multiscale algorithm was motivated by the drawbacks discussed above
+with the standard NCut algorithm.  More sophisticated multiscale algorithms based on NCut have 
+been proposed in the literature, but have not been implemented here\cite{cour}\cite{sharon}\cite{yu}.
+The basic idea of this simple multiscale algorithm is that (1) coarser levels of a gaussian 
+pyramid will better represent the more salient segments in the image, and (2) will 
+be efficient to calculate due to their smaller size.  The segmentation is then refined in
+finer levels of the pyramid only between pixels in the same coarse segment.  Thus, segmentation
+at the finer level is performed multiple times, but each considers only roughly half the pixels.  
+Thus, the affinity matrix in each case is $4$ times smaller than considering the two segments 
+simultaneously. This means that while the size of the local neighborhood must still decreased at finer
+pyramid levels, the reduction is not nearly as drastic.  
+One problem with this approach is that boundaries computed at coarse levels of the pyramid
+are jagged relative to the original image size.  To address this, pixels are probilistically
+assigned to segments, therefore allowing ambiguous pixels to be segmented at a finer resolution.
+An outline of the algorithm is given in Algorithm~\ref{alg:rncut}.
+\begin{algorithm}[htb]
+	\caption{Multiscale Recursive Normalized Cut Algorithm}
+	\label{alg:rncut}
+	\begin{algorithmic}[1]
+		\STATE Compute gaussian pyramid of image
+		\STATE Compute 2-way segmentation at coarsest level of the pyramid
+		\FOR{each segment}
+		\STATE Compute a the probability that an image pixel is in that 
+		segment given it's value in the second eigenvector.
+		\STATE Recursively compute the segmentation at the next finer level
+		in the pyramid, only considering pixels above a given threshold
+		in the probability map
+		\ENDFOR
+	\end{algorithmic}
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiments}
+The algorithms were run on the test images in the Berkeley Segmentation Dataset and Benchmark\cite{MartinFTM01}. 
+The dataset consists of 200 training images and 100 test images of natural scenes.  Each image
+has roughly five ground-truth segmentations generated by human subjects.  There is a benchmark associated with the
+dataset that compares the machine generated segmentation with the human segmentations.  However, this benchmark
+expects the segmentation algorithm to produce a probabilistic edge map, whereas the algorithms used here produce definite regions, so the running the numerical benchmark was not useful.  Qualitative results are reported only.
+For the standard NCut algorithm, images were subsampled to approximately $100\times100$ pixels to make
+enough memory available to the eigensolver. In each algorithm, the distance metric $w_{ij}$ used was:
+\begin{eqnarray*}
+	w_{ij} = \left\{\begin{array}{ll}
+	    e^{-\left(\frac{(I(x_i) - I(x_j)).^2}{\sigma_i^2} - \frac{(|| x_i - x_j ||^2}{\sigma_x^2}\right) } & ||x_i-x_j||^2 < r \\
+		0 & otherwise
+	\end{array}\right.
+\end{eqnarray*}
+Where $I(x_i)$ is the image intensity at pixel location $x_i$, $\sigma_i$ is an intensity weighting term, $\sigma_x$ is a distance weighting term, and $r$ is the size of the local neighborhood.  The value of $\sigma_x$ was set to $r$ to gradually penalize the distance based on the neighborhood.  The size of the neighborhood, $r$ was chosen as large as possible, keeping the number of non-zero elements of the affinity matrix under some threshold.  The value of $\sigma_i$ was determined by computing the gradient of the image at every pixel under consideration, and taking the average.
+% 
+\subsection{Results}
+Qualitative results for 3 select images are shown in Figures~\ref{fig:res1},\ref{fig:res2},\ref{fig:res3}.  The 
+basic NCut algorithm gives reasonable results on some images (Figure~\ref{fig:res1}), worse results on others,
+and useless results on many.  Given a small neighborhood, the basic NCut algorithm was found to be highly sensitive
+to values of $\sigma_i$ and $\sigma_r$.  The results here all use method described previously, but in my experimentation, hand-tuning these parameters on a per image yielded better results (not shown here).  The multiscale algorithm is disappointing.  While it is segmenting salient structures, the boundaries are very simplistic, and in 
+many cases echoed.  In retrospect, this echo is clearly the result of the probabilistic cluster membership.  Instead of refining the boundary at finer scales, the boundary is duplicated.  More thought and investigation into existing methods is due here. 
+\begin{figure}
+	 \centerline{
+	    \mbox{\includegraphics[scale=0.33]{orig/143090}}
+		\mbox{\includegraphics[scale=0.33]{human/143090}}
+	}
+	\centerline{
+		\mbox{\includegraphics[scale=0.33]{rncut/143090}}
+		\mbox{\includegraphics[scale=0.33]{ncut/143090}}
+	}
+	\caption{Clockwise from top left: BSDS300 Test Image 143090, Human Segmentation, NCut Segmentation, Multiscale NCut}
+	\label{fig:res1}
+\end{figure}
+\begin{figure}
+	 \centerline{
+	    \mbox{\includegraphics[scale=0.33]{orig/101087}}
+		\mbox{\includegraphics[scale=0.33]{human/101087}}
+		\mbox{\includegraphics[scale=0.33]{ncut/101087}}
+		\mbox{\includegraphics[scale=0.33]{rncut/101087}}
+	}
+	\caption{From the left: BSDS300 Test Image 101087, Human Segmentation, NCut Segmentation, Multiscale NCut}
+	\label{fig:res2}
+\end{figure}
+\begin{figure}
+	 \centerline{
+	    \mbox{\includegraphics[scale=0.33]{orig/134035}}
+		\mbox{\includegraphics[scale=0.33]{human/134035}}
+	}
+	\centerline{
+		\mbox{\includegraphics[scale=0.33]{rncut/134035}}
+		\mbox{\includegraphics[scale=0.33]{ncut/134035}}
+	}
+	\caption{Clockwise from top left: BSDS300 Test Image 134035, Human Segmentation, NCut Segmentation, Multiscale NCut}
+	\label{fig:res3}
+\end{figure}
+\bibliography{project1}
+\end{document}

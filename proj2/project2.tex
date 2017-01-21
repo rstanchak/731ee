@@ -1,0 +1,128 @@
+\documentclass{article}
+\title{ Structure from Motion using Factorization }
+\author{ Roman Stanchak }
+\date{ October 27, 2006 }
+
+%%%% includes %%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\bibliographystyle{plain}
+
+%%%% macros %%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\gaussian}[2]{\frac{1}{ \sqrt{2\pi #1^2}}e^\frac{-{#2}^2}{2 #1^2}}
+\newcommand{\fourier}{\mathcal{F}}
+\newcommand{\dsigma}{\Delta\sigma}
+%%%% document %%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+\section{Structure from Motion}
+Two structure from motion algorithms were implemented and tested for this project, both based 
+on factorization of a measurement matrix.  A brief description of the algorithms is given, 
+some details of the implementation, then results.
+\subsection{Tomasi-Kanade Orthographic Factorization}
+In \cite{tomasi1992} Tomasi and Kanade show that assuming and orthographic camera, a measurement matrix containing centered 2D point coordinates over multiple views can be factored into shape 
+and motion components.  The outline of the algorithm as implemented in this paper is as follows:
+\begin{algorithm}[htb]
+    \caption{Orthographic Factorization Algorithm}
+    \label{alg:ofact}
+    \begin{algorithmic}[1]
+		\STATE Collect $p$ corresponding image points in $f$ image frames.
+        \STATE Translate image coordinates such that $\mu_{x,y}=0$.
+		\STATE Construct $2f \times p$ measurement matrix $\mathbf{W}$
+		\STATE Compute the SVD of $W=U\Sigma V^T$
+		\STATE Construct rank 3 approximation $\hat{W}=\hat{R}\hat{S}$, where \\ 
+		$\hat{R}=U_{:,1:3}\Sigma_{1:3,1:3}^{1/2}$, $\hat{S}=\Sigma_{1:3,1:3}^{1/2}V_{:,1:3}^T$.
+		\STATE Compute invertible $Q$ such that $R=\hat{R}Q$ is a true rotation matrix. \\
+		Set shape $S=Q^{-1}\hat{S}$ to maintain $\hat{W} = RS$.
+	\end{algorithmic}
+\end{algorithm}
+ 
+
+
+\subsection{Sturm-Triggs Projective Factorization}
+In \cite{sturm1996} and \cite{triggs1996} Sturm and Triggs show that by constructing 
+the measurement matrix $\mathbf{W}$ using projective coordinates, a similar factorization
+method can be used to recover the projective shape and motion parameters.  The outline of projective factorization as implemented is described in Algorithm~\ref{alg:pfact}.
+\begin{algorithm}[htb]
+	\caption{Projective Factorization Algorithm}
+	\label{alg:pfact}
+	\begin{algorithmic}[1]
+		\STATE Collect at least 8 corresponding points in at least 3 successive images.
+		\STATE Normalize image coordinates such that $\mu_{x,y}=0$ and $\sigma_{x,y}=1$.
+		\STATE Estimate the fundamental matrices using any method.
+		\STATE Determine the projective scale factors $\lambda_{ip}$
+		\STATE Normalize the scale factors
+		\STATE Build the rescaled measurement matrix $\mathbf{W}$
+		\STATE Compute the SVD of $\mathbf{W}$
+		\STATE Compute the projective motion and shape using the 4 most significant singular vectors.
+	\end{algorithmic}
+\end{algorithm}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiments and Results}
+The algorithms were tested on the well known 'Castle' image sequence.  A set of 32 points
+were manually selected in the initial frame and tracked over the next 10.  When tracking failed,the position was reset manually so there was no missing data.  These correspondences were used in both factorization methods and in calculation of the fundamental matrices.  
+
+\subsection{Orthographic Factorization}
+The derived camera motion was used to project the derived shape back to two dimensions, where the resulting 2D point locations were compared with the original locations (Figure~\ref{fig:tk_proj}).
+The resulting shape was also texture mapped to represent the original 3D structure of the scene (Figure~\ref{fig:tk_reconst}), though the shape here is severely warped, so I suspect I did something wrong.
+\begin{figure}[htb]
+	\centerline{
+		\mbox{\includegraphics[width=2.5in]{images/img_err_plot_cropped}}
+		\mbox{\includegraphics[width=2.5in]{images/feature_err_plot_cropped}}
+		}
+	\caption{Plot of reprojection error per image and per feature for orthographic factorization.  The canonical reference frame was image 5.}
+	\label{fig:tk_proj} \end{figure}
+\begin{figure}[htb]
+	\centerline{
+		\mbox{\includegraphics[width=1.5in]{images/tkortho_045}}
+		\mbox{\includegraphics[width=1.5in]{images/tkortho_090}}
+		\mbox{\includegraphics[width=1.5in]{images/tkortho_095}}
+		}
+	\caption{Texture mapped 3D structure of scene ($45^o$, $0^o$, $-5^o$)}
+	\label{fig:tk_reconst}
+\end{figure}
+\subsection{Projective Factorization}
+For projective factorization, the fundamental matrices defining the relationship between subsequent
+camera views was required.  The normalized 8 point algorithm \cite{hartley1992} was implemented to calculate the fundamental matrices.  The epipolar lines for the points in the first image pair are shown in Figure~\ref{fig:epi}. Also shown are results utilizing the LMedS algorithm from the OpenCV library.  This algorithm identifies outliers which in this case significantly affect the resulting epipolar lines.  Ideally, this information could have been used to not consider these points in the factorization, but time did not permit.
+\subsection{Results}
+\begin{figure}[htb]
+	 \centerline{
+	    \mbox{\includegraphics[width=2.5in]{images/epipolar1_1}}
+		\mbox{\includegraphics[width=2.5in]{images/epipolar2_2}}
+	}
+	\centerline{
+		\mbox{\includegraphics[width=2.5in]{images/epipolar1_lmeds1}}
+		\mbox{\includegraphics[width=2.5in]{images/epipolar2_lmeds2}}
+	}
+	\caption{Epipolar lines for the 32 tracked points used to calculate the
+	fundamental matrices.  Top: Normalized 8 point algorithm (implemented). Bottom: LMedS algorithm (from OpenCV)}
+	\label{fig:epi}
+\end{figure}
+As with orthographic factorization, the derived projective shape was reprojected to 2 dimensions using the projective motion parameters.  Figure~\ref{fig:tr_reproj} shows significant differences
+between the original points and the reprojected versions.  The source of this error is as yet undetermined.  The per-image and per-feature plots in Figure~\ref{fig:tr_plots} again the extent of this deviation.
+
+\begin{figure}[htb]
+	\centerline{
+		\mbox{\includegraphics[width=2.5in]{images/tr_proj_1}}
+		\mbox{\includegraphics[width=2.5in]{images/tr_proj_5}}
+	}
+	\caption{Reprojected points(red) shown on the image plane compared to original(green).  There
+	is significant error here.  Shown are images 1 and 5 of the sequence. }
+	\label{fig:tr_reproj}
+\end{figure}
+\begin{figure}[htb]
+	\centerline{
+		\mbox{\includegraphics[width=2.5in]{images/tr_img_err_plot_cropped}}
+		\mbox{\includegraphics[width=2.5in]{images/tr_feature_err_plot_cropped}}
+	}
+	\caption{Plot of reprojection error per image and per feature for projective factorization.    The algorithm does not have a canonical camera view. }
+	\label{fig:tr_plots}
+\end{figure}
+
+\bibliography{project2}
+\end{document}

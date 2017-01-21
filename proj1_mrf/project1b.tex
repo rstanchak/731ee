@@ -1,0 +1,65 @@
+\documentclass{article}
+\title{ Segmentation of Traffic Camera Images Using Markov Random Fields\\ 
+Image Understand ENEE 731\\
+Project 1 (Part 2)}
+\author{ Roman Stanchak }
+
+%%%% includes %%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\bibliographystyle{plain}
+
+%%%% macros %%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\gaussian}[2]{\frac{1}{ \sqrt{2\pi #1^2}}e^\frac{-{#2}^2}{2 #1^2}}
+\newcommand{\fourier}{\mathcal{F}}
+\newcommand{\dsigma}{\Delta\sigma}
+%%%% document %%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+\section{Summary}
+The goal of this project was to use a Markov Random Field (MRFs) to improve segmentation of 
+a sequence of automobile traffic images.  The categorization of the pixels in these images
+into foreground and background is highly spatially correlated, thus, it was hypothesized that
+this would be a useful application for MRFs.  
+
+\subsection{Data}
+Images from the Washington, DC traffic camera network were sampled roughly every two seconds at a single location.  An overcast day was chosen to minimize specularities.  In all, roughly 3 hours of images were captured.  \\
+
+\section{Experiments}
+The MRF was defined on a single image as follows:  $S$, the set of sites: the set of pixel locations $(i,j)$; the label set $L=\{\textbf{foreground},\textbf{background}\}$.  The Gibbs Random Field framework was used to formulate the energy function.  The energy function was formulated as a combination of the $P(\textbf{label})$ and $P(\textbf{image              intensity}|\textbf{foreground/background})$ at each site.  These values were learned from a bootstrap background model.  This bootstrap model was created from the first 100 images using a temporal median filter.  Patches corresponding to cars were extracted from these
+images using the bootstrap model and a variety of morphological operations and connected component grouping.  For each pixel, $P(\textbf{foreground})$ and $P(\textbf{background})$ were estimated as the proportion of frames matching that label over the training set.  $P(\textbf{image intensity}|\textbf{foreground/background})$ were estimated by fitting a single gaussian to the 
+image intensities occurring for each label. The results of this background model are show in Figure \ref{fig:fgbg}.  The joint distribution of labels for neighboring pixels was also modeled, but
+in the end a simple clique potential function was used (i.e. potential is constant if same label, 0 otherwise).   The Maximum A Posterior estimate given by
+$$MAX_{X \in\textbf{ possible labelings}} \prod_{(x,y)\in S} P(\mathbf{I}(x,y)|\textbf{label}(x,y)=x_i)P(\textbf{label}(x,y)=x_i)$$
+was used to seed the optimization.
+
+\section{Results}
+To find the most likely labeling of pixels, both Simulated Annealing and Graph Cut were employed.
+When seeded with a random labeling, simulated annealing converged to a noisy version of the MAP estimate after many hours.  When seeded with the MAP estimate, simulated annealling left the labeling virtually unaltered.  Graph cut produced similar results, though much more quickly.  These results seemed to indicate that the clique potentials were not contributing enough weight, though efforts to accomodate for this met with similar results.  Actual results are not shown since they did not deviate from the MAP estimate.
+
+\begin{figure}
+	\centerline{
+		\mbox{\includegraphics[scale=0.5]{image_200030_0156}}
+		\mbox{\includegraphics[scale=0.5]{fgbg_200030_0156}}
+	}
+	\centerline{
+		\mbox{\includegraphics[scale=0.5]{image_200030_0374}}
+		\mbox{\includegraphics[scale=0.5]{fgbg_200030_0374}}
+	}
+	\centerline{
+		\mbox{\includegraphics[scale=0.5]{image_200030_0666}}
+		\mbox{\includegraphics[scale=0.5]{fgbg_200030_0666}}
+	}
+	\centerline{
+		\mbox{\includegraphics[scale=0.5]{image_200030_1327}}
+		\mbox{\includegraphics[scale=0.5]{fgbg_200030_1327}}
+	}
+
+	\caption{Sample images from the traffic sequence.  Left: original images. Right: MAP estimate of background segmentation (foreground is in black). }
+	\label{fig:fgbg}
+\end{figure}
+
+\end{document}

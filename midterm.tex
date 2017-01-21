@@ -1,0 +1,202 @@
+\documentclass{article}
+\title{ Midterm \\ Image Understand ENEE 731 }
+\author{ Roman Stanchak }
+\date{ October 27, 2006 }
+
+%%%% includes %%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{graphicx}
+\bibliographystyle{plain}
+
+%%%% macros %%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\gaussian}[2]{\frac{1}{ \sqrt{2\pi #1^2}}e^\frac{-{#2}^2}{2 #1^2}}
+\newcommand{\fourier}{\mathcal{F}}
+\newcommand{\dsigma}{\Delta\sigma}
+%%%% document %%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+\begin{enumerate}
+\item \textit{Claim} It is impossible to determine the motion and structure uniquely from two orthographic views no matter how many point correspondances you have. 
+\\
+\textit{Proof} Suppose one tracks a single $2D$ points $(x,y)$ from one view to the next.  For an orthographic
+projection, a $3D$ point $(X,Y,Z)$ relative to the camera is related to 2D point $(x,y)$ in the image by:
+\begin{eqnarray}
+x&=&X\\
+y&=&Y
+\end{eqnarray}
+If the $3D$ point $\mathbf{X}$ undergoes motion to a new point $\mathbf{X}'$, this can be represented as a rotation and translation, which in matrix form:
+$$\mathbf{X}'=R\mathbf{X}+T$$
+Expanding this to show all the components:
+\begin{eqnarray}
+\left[
+\begin{array}{c}
+	X'\\
+	Y'\\
+	Z'
+\end{array}
+\right] &=& 
+\left[
+\begin{array}{ccc}
+	r_1 & r_2 & r_3 \\
+	r_4 & r_5 & r_6 \\
+	r_7 & r_8 & r_9
+\end{array}
+\right]
+\left[
+\begin{array}{c}
+	X\\
+	Y\\
+	Z
+\end{array}
+\right] + 
+\left[
+\begin{array}{c}
+	T_x\\
+	T_y\\
+	T_z
+\end{array}
+\right]
+\end{eqnarray}
+Plugging in $x$ and $y$, and multiplying out
+\begin{eqnarray}
+	\left[
+	\begin{array}{c}
+		x'\\
+		y'\\
+		0
+	\end{array}
+	\right]
+	&=&
+\left[
+\begin{array}{c}
+	r_1x + r_2y + r_3Z + T_x\\
+	r_4x + r_5y + r_6Z + T_y\\
+	r_7x + r_8y + r_9Z + T_z - Z'
+\end{array}
+\right]
+\end{eqnarray}
+From tracking in $2D$, $x$,$x'$,$y$ and $y'$ are known. However, note the inherent ambiguity 
+between $T_z$ and $Z'$.  Any pair of $T_z$, $Z'$ for which 
+$Z'-T_z=r_7X+r_8Y+r_9Z$ is a valid solution to the structure and motion for one point (and there 
+are an infinite number of these).  Adding correspondences does not help resolve the ambiguity.  Although
+each additional correspondance $X'<=>X$ introduces one constraint on $T_z$, it also introduces a new degree 
+freedom in $Z_i'$. Thus, the net gain in constraints is zero, and it is impossible to resolve this ambiguity,
+regardless of the number of correspondences.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\item An $MxN$ image $y(s)$ is represented with a discrete-grid first-order GMRF with toroidal boundary 
+	conditions as given:
+\begin{eqnarray*}
+	y(s) = \theta_1(y(s+(0,1)+y(s+(0,-1)) + \theta_2(y(s+(1,0))+y(s+(-1,0))
+\end{eqnarray*}
+By stacking the constraints, and factoring out the $y(s)$'s, the 
+matrix form of the GMRF is produced:
+\begin{eqnarray*}
+\left[ 
+	\begin{array}{c}
+		e(0,0)\\
+		e(0,1)\\
+		\dots\\
+		e(M-1,N-1)
+	\end{array}
+\right] 
+&=& 
+B \left[
+	\begin{array}{c}
+		y(0,0)\\
+		y(0,1)\\
+		\dots\\
+		y(M-1,N-1)
+	\end{array}
+\right]
+\end{eqnarray*}
+where
+\begin{eqnarray*}
+	B &=&
+	\left[
+	\begin{array}{cccccccccccccc}
+		1 & \theta_1 & 0 & \dots & 0 & \theta_2 & 0 & \dots & 0 & \theta_2 & 0 & \dots & 0 & \theta_1 \\
+		\theta_1 & 1 & \theta_1 & 0 & \dots & 0 & \theta_2 & 0 & \dots & 0 & \theta_2 & 0 & \dots \\
+		\dots \\
+		\theta_1 & 0 & \dots & 0 & \theta_2 & 0 & \dots & 0 & \theta_2 & 0 & \dots & 0 & \theta_1 & 1 
+	\end{array}
+	\right]
+\end{eqnarray*}
+Note that since the GMRF is defined on a discrete grid with toroidal boundary conditions, the model 
+'wraps around' on the boundaries, and the matrix $B$ is block-circulant.\\
+For the GMRF to be well posed, $B$ must be positive-definite. In order for this to be the case, the
+eigenvalues $\lambda_s$ of $B$ must be positive:
+\begin{eqnarray*}
+	\lambda_s > 0, \forall s \in \Omega
+\end{eqnarray*}
+Where $\lambda_s$ are\cite{chellappa85}:
+\begin{eqnarray*}
+	\lambda_s &=& 1 - \sum_{r\in N(s)}\theta_1 cos \left( \frac{2\pi}{M}r_{y} + \frac{2\pi}{N}r_{x} \right)
+\end{eqnarray*}
+And in our simple case:
+\begin{eqnarray*}
+	\lambda_s &=& 1 - \theta_1 \left[
+			cos \left( \frac{2\pi}{M}s_{y} + \frac{2\pi}{N}s_{x+1} \right) + 
+	    	cos \left( \frac{2\pi}{M}s_{y} + \frac{2\pi}{N}s_{x-1} \right) 
+		\right] + \\
+		&&\theta_2 \left[
+			cos \left( \frac{2\pi}{M}s_{y+1} + \frac{2\pi}{N}s_{x} \right) + 
+	        cos \left( \frac{2\pi}{M}s_{y-1} + \frac{2\pi}{N}s_{x} \right)
+		\right]
+\end{eqnarray*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\item Simulated annealing, ICM, and MPM are all algorithms used to optimize
+	Markov Random Fields.  In terms of computational cost, simulated annealing
+	carries a heavy penalty for proof of convergence.  In the standard algorithm,
+	pixels are perturbed one-by-one, and the energy function must be updated for 
+	each site part of a clique with the modified site.
+	Thus, for a $k$-order model, the number of affected sites will be $\mathcal{O}(k^2)$ 
+	and the number of operations per site is $\mathcal{O}(k^2)$ for a total of $\mathcal{O}(k^4)$.
+	Thus for an $M\times N$ image, one complete sweep over the image costs $\mathcal{O}(MNk^4)$.
+	ICM is the simplest i	
+	and thus, the lowest burden.  MPM is computationally more expensive than ICM
+	and simulated annealing is the most expensive.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\item If $y(s), s\in\Omega$ is represented as GMRF, and $y_1(s)$ is created by
+	skipping every other pixel in the $x$ and $y$ directions, then $y_1(s)$ is
+	no longer a GMRF model.  The reason is that $y_1(s)$ no longer has the 
+	Markov property -- there is no longer a local neighborhood $N$ for which
+	\begin{eqnarray}
+	P\left( y_1(s) | y_1(r),  \forall r \neq s \right) &=& P\left( y_1(s) | y_1(s+r), \forall r \in N \right)
+	\end{eqnarray}
+	To analyze why this is the case, consider an $k$th order GMRF model.
+	\begin{eqnarray}
+		y(s) = \sum_{r<k} \sigma_{s,r}(y(s+r)+y(s-r)) + e(s)
+	\end{eqnarray}
+	Now separate the $y$ into 'skipped'($y_0$) and 'kept' ($y_1$) sets. Then relation then becomes:
+	\begin{eqnarray}
+		y(s) = \sum{r_0<k/2} \sigma_{s,r_0}(y_0(s+r_1)+y_0(s-r_0)) + \sum{r_1<k/2} \sigma_{s,r_1}(y_1(s+r_1)+y_1(s-r_1) + e(s)
+	\end{eqnarray}
+	Since $y_0$ are no longer available, we can no longer claim the Markov property.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\item \textit{a.} Show that $\nabla^2 G$ is the limit of the a $DOG$ Operator:
+\begin{eqnarray*}
+DOG(\sigma_e, \sigma_i) &=& \frac{1}{\sqrt{2\pi}}\left( \frac{e^{-x^2/2\sigma_e^2}}{\sigma_e} - \frac{e^{-x^2/2\sigma_i^2}}{\sigma_i} \right)
+\end{eqnarray*}
+Let $\sigma = \sigma_e$, $\sigma_i = \sigma + \dsigma$:
+\begin{eqnarray*}
+&=& \frac{1}{\sqrt{2\pi}}\left( \frac{e^{-x^2/2\sigma^2}}{\sigma} - \frac{e^{-x^2/2(\sigma+\dsigma)^2}}{(\sigma+\dsigma)} \right)
+\end{eqnarray*}
+Note that the derivative of a gaussian function $G(x,\sigma)$ WRT $\sigma$ is:
+$$ \frac{\partial G}{\partial\sigma} = \lim_{\dsigma\to 0} \frac{G(x,\sigma+\dsigma)-G(x,\sigma)}{\dsigma}$$
+So
+$$ \frac{\partial G}{\partial\sigma} = \lim_{\dsigma\to 0} \frac{DOG(\sigma, \dsigma)}{\dsigma}$$
+Expanding the $LHS$ derivative,
+$$ \frac{1}{\sqrt{2\pi}} \frac{1}{\sigma^2}\left(\frac{x^2}{\sigma^2}-1\right)e^{-\frac{x^2}{2\sigma^2}} = \lim_{\dsigma\to 0} \frac{DOG(\sigma, \dsigma)}{\dsigma}$$
+Now, since the second derivative of $G$ WRT $x$:
+$$\frac{\partial^2G}{\partial x^2} = \frac{1}{\sqrt{2\pi}\sigma^3}\left(\frac{x^2}{\sigma^2}-1\right)e^{-x\frac{x^2}{2\sigma^2}}$$ 
+The $LHS$ becomes:
+$$ \frac{1}{\sigma}\frac{\partial^2G}{\partial x^2} = \lim_{\dsigma\to 0} \frac{DOG(\sigma, \dsigma)}{\dsigma}$$ 
+Thus, in the limit, the Difference of Gaussian operator is equivalent to $\frac{\partial^2G}{\partial x^2}$ up to a scale factor.\\
+\\
+\textit{b.} The use of a DOG filter is preferred in most real-world applications due to its separability into 1-D convolutions in the x and y directions, thus reducing an $\mathcal{O}(k^2)$ operation to $\mathcal{O}(k)$ (where $k$ is the width of the convolution kernel).  However, as Marr and Hildreth point out, one must select the excitory and inhibitory constants ($\sigma_e$,$\sigma_i$) carefully in order to minimize the bandwidth of the filter, yet maintain adequate sensitivity.  By analyzing the bandwidth and peak sensitivity of a DOG for 
+varying $\sigma_i/\sigma_e$, they show the approximation has optimal properties for $\sigma_i/\sigma_e<1.6$\cite{marrhildreth80}.  
+\end{enumerate}
+\bibliography{midterm}
+\end{document}
